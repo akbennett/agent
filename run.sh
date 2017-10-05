@@ -3,6 +3,7 @@
 function update_agent {
 	echo "Checking current image sha..."
 	docker_current_sha=$(docker inspect "opensourcefoundries/agent:latest" | grep Id | sed "s/\"//g" | sed "s/,//g" |  tr -s ' ' | cut -d ' ' -f3)
+	echo "Current agent sha: $docker_current_sha"
 	echo "Checking for new agent container..."
 	docker pull opensourcefoundries/agent:latest
 	docker_new_sha=$(docker inspect "opensourcefoundries/agent:latest" | grep Id | sed "s/\"//g" | sed "s/,//g" |  tr -s ' ' | cut -d ' ' -f3)
