@@ -1,7 +1,7 @@
 #!/bin/bash
 
 function update_agent {
-	echo "Checking current image sha..."
+	echo "Checking current agent image sha..."
 	docker_current_sha=$(docker inspect "opensourcefoundries/agent:latest" | grep Id | sed "s/\"//g" | sed "s/,//g" |  tr -s ' ' | cut -d ' ' -f3)
 	echo "Current agent sha: $docker_current_sha"
 	echo "Checking for new agent container..."
@@ -10,7 +10,8 @@ function update_agent {
 	if [ "$docker_current_sha" != "$docker_new_sha" ] ; then
 		echo "New agent container detected..."
 		echo "Restarting updated agent container..."
-		docker restart agent
+		docker run -d -v /var/run/docker.sock:/var/run/docker.sock --name=agent_new --rm opensourcefoundries/agent $1 $2
+		docker stop agent
 	else
 		echo "No new agent container..."
 	fi
@@ -28,16 +29,18 @@ function update {
 	docker-compose up -d
 }
 
+repo=$1
+branch=$2
 rm -rf tmp
-sha=($(git ls-remote $1 refs/heads/$2))
-git clone $1 -b $2 tmp
+sha=($(git ls-remote $repo refs/heads/$branch))
+git clone $repo -b $branch tmp
 cd tmp
 echo "Current sha: $sha"
 update $sha
 
 while true
 do
-	sha=($(git ls-remote $1 refs/heads/$2))
+	sha=($(git ls-remote $repo refs/heads/$branch))
 	echo "Current sha: $sha"
 	current=$(cat /tmp/current.sha)
 	if [ "$sha" != "$current" ] ; then
@@ -46,7 +49,12 @@ do
 		update $sha
 	else
 		echo "No new deployment found..."
-		update_agent
+		if docker ps | grep agent_new
+		then
+			echo "Found new agent container, renaming..."
+			docker rename agent_new agent
+		fi
+		update_agent $repo $branch
 		sleep 20
 	fi
 done
