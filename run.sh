@@ -1,5 +1,20 @@
 #!/bin/bash
 
+function update_agent {
+	echo "Checking current image sha..."
+	docker_current_sha=$(docker inspect "opensourcefoundries/agent:latest" | grep Id | sed "s/\"//g" | sed "s/,//g" |  tr -s ' ' | cut -d ' ' -f3)
+	echo "Checking for new agent container..."
+	docker pull opensourcefoundries/agent:latest
+	docker_new_sha=$(docker inspect "opensourcefoundries/agent:latest" | grep Id | sed "s/\"//g" | sed "s/,//g" |  tr -s ' ' | cut -d ' ' -f3)
+	if [ "$docker_current_sha" != "$docker_new_sha" ] ; then
+		echo "New agent container detected..."
+		echo "Restarting updated agent container..."
+		docker restart agent
+	else
+		echo "No new agent container..."
+	fi
+}
+
 function update {
 	echo $1 > /tmp/current.sha
 	echo "Bringing down current container set..."
@@ -30,6 +45,7 @@ do
 		update $sha
 	else
 		echo "No new deployment found..."
+		update_agent
 		sleep 20
 	fi
 done
