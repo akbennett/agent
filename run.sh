@@ -1,13 +1,15 @@
 #!/bin/bash
 
-rm -rf agent-watch
+rm -rf tmp
 sha=($(git ls-remote $1 refs/heads/$2))
-git clone $1 -b $2
-cd agent-watch
+git clone $1 -b $2 tmp
+cd tmp
 echo "Current sha: $sha"
 echo $sha > /tmp/current.sha
 echo "Bringing down current container set..."
 docker-compose down
+echo "Deleteing current container set..."
+docker-compose rm -f
 echo "Bringing up current container set.."
 docker-compose up -d
 
@@ -22,6 +24,8 @@ do
 		echo $sha > /tmp/current.sha
 		echo "Bringing down current container set..."
 		docker-compose down
+		echo "Deleteing current container set..."
+		docker-compose rm -f
 		echo "Bringing up current container set.."
 		docker-compose up -d
 	else
