@@ -15,12 +15,12 @@ function update_agent {
 
 function update {
 	echo $1 > /tmp/git.sha
+	echo "DOCKER_COMPOSE: Updating current container set..."
+	docker-compose pull --parallel
 	echo "DOCKER-COMPOSE: Bringing down current container set..."
 	docker-compose down
 	echo "DOCKER-COMPOSE: Deleteing current container set..."
 	docker-compose rm -f
-	echo "DOCKER-COMPOSE: Updating current container set..."
-	docker-compose pull
 	echo "DOCKER-COMPOSE: Bringing up current container set.."
 	docker-compose up -d
 }
