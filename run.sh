@@ -28,39 +28,54 @@ function update {
 repo=$1
 branch=$2
 rm -rf tmp
-sha=($(git ls-remote $repo refs/heads/$branch))
-git clone $repo -b $branch tmp
-cd tmp
-echo "INIT: TRIGGER: SHA: $sha"
-if docker ps | grep agent_new > /dev/null
+if sha=($(git ls-remote $repo refs/heads/$branch))
 then
-	echo "INIT: UPDATE: Agent updated..."
-	echo $sha > /tmp/git.sha
-else
-	echo "INIT: FIRSTBOOT: Updating current container set..."
-	update $sha
+	git clone $repo -b $branch tmp
+	cd tmp
+	echo "INIT: TRIGGER: SHA: $sha"
+	if docker ps | grep agent_new > /dev/null
+	then
+		echo "INIT: UPDATE: Agent updated..."
+		echo $sha > /tmp/git.sha
+	else
+		echo "INIT: FIRSTBOOT: Updating current container set..."
+		update $sha
+	fi
 fi
 
 while true
 do
-	sha=($(git ls-remote $repo refs/heads/$branch))
-	echo "LOOP: TRIGGER: SHA: $sha"
-	current=$(cat /tmp/git.sha)
-	if [ "$sha" != "$current" ] ; then
-		git pull
-		echo "LOOP: TRIGGER: New deployment found, updating..."
-		update $sha
-	else
-		echo "LOOP: TRIGGER: No new deployment found..."
-		if docker ps | grep agent_new > /dev/null
+	if [ -f /tmp/git.sha ] ; then
+		if sha=($(git ls-remote $repo refs/heads/$branch))
 		then
-			echo "LOOP: TRIGGER: Found new agent container, renaming..."
-			docker rename agent_new agent > /dev/null
+			echo "LOOP: TRIGGER: SHA: $sha"
+			current=$(cat /tmp/git.sha)
+			if [ "$sha" != "$current" ] ; then
+				git pull
+				echo "LOOP: TRIGGER: New deployment found, updating..."
+				update $sha
+			else
+				echo "LOOP: TRIGGER: No new deployment found..."
+				if docker ps | grep agent_new > /dev/null
+				then
+					echo "LOOP: TRIGGER: Found new agent container, renaming..."
+					docker rename agent_new agent > /dev/null
+				fi
+				agent_current_sha=$(docker inspect "opensourcefoundries/agent:latest" | grep Id | sed "s/\"//g" | sed "s/,//g" |  tr -s ' ' | cut -d ' ' -f3)
+				echo $agent_current_sha > /tmp/agent.sha
+				echo "LOOP: AGENT: Checking for new agent container..."
+				update_agent $repo $branch
+			fi
+		else
+			echo "LOOP: ERROR: Cannot fetch latest SHA"
 		fi
-		agent_current_sha=$(docker inspect "opensourcefoundries/agent:latest" | grep Id | sed "s/\"//g" | sed "s/,//g" |  tr -s ' ' | cut -d ' ' -f3)
-		echo $agent_current_sha > /tmp/agent.sha
-		echo "LOOP: AGENT: Checking for new agent container..."
-		update_agent $repo $branch
-		sleep 20
+	else
+		echo "LOOP: ERROR: Current SHA Not Found: Deferring..."
+		if sha=($(git ls-remote $repo refs/heads/$branch))
+		then
+			echo "LOOP: RECOVERING: Current SHA Found... "
+			echo $sha > /tmp/git.sha
+		fi
 	fi
+	sleep 20
 done
