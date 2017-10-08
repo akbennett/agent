@@ -14,7 +14,7 @@ function update_agent {
 }
 
 function update {
-	echo $1 > /tmp/git.sha
+	echo $1 > $workingdir/git.sha
 	echo "DOCKER_COMPOSE: Updating current container set..."
 	docker-compose pull --parallel
 	echo "DOCKER-COMPOSE: Bringing down current container set..."
@@ -27,16 +27,17 @@ function update {
 
 repo=$1
 branch=$2
-rm -rf tmp
+workingdir=/tmp/"${repo##*/}"
+rm -rf $workingdir
 if sha=($(git ls-remote $repo refs/heads/$branch))
 then
-	git clone $repo -b $branch tmp
-	cd tmp
+	git clone $repo -b $branch $workingdir
+	cd $workingdir
 	echo "INIT: TRIGGER: SHA: $sha"
 	if docker ps | grep agent_new > /dev/null
 	then
 		echo "INIT: UPDATE: Agent updated..."
-		echo $sha > /tmp/git.sha
+		echo $sha > $workingdir/git.sha
 	else
 		echo "INIT: FIRSTBOOT: Updating current container set..."
 		update $sha
@@ -45,11 +46,11 @@ fi
 
 while true
 do
-	if [ -f /tmp/git.sha ] ; then
+	if [ -f $workingdir/git.sha ] ; then
 		if sha=($(git ls-remote $repo refs/heads/$branch))
 		then
 			echo "LOOP: TRIGGER: SHA: $sha"
-			current=$(cat /tmp/git.sha)
+			current=$(cat $workingdir/git.sha)
 			if [ "$sha" != "$current" ] ; then
 				git pull
 				echo "LOOP: TRIGGER: New deployment found, updating..."
@@ -62,7 +63,7 @@ do
 					docker rename agent_new agent > /dev/null
 				fi
 				agent_current_sha=$(docker inspect "opensourcefoundries/agent:latest" | grep Id | sed "s/\"//g" | sed "s/,//g" |  tr -s ' ' | cut -d ' ' -f3)
-				echo $agent_current_sha > /tmp/agent.sha
+				echo $agent_current_sha > $workingdir/agent.sha
 				echo "LOOP: AGENT: Checking for new agent container..."
 				update_agent $repo $branch
 			fi
@@ -74,7 +75,7 @@ do
 		if sha=($(git ls-remote $repo refs/heads/$branch))
 		then
 			echo "LOOP: RECOVERING: Current SHA Found... "
-			echo $sha > /tmp/git.sha
+			echo $sha > $workingdir/git.sha
 		fi
 	fi
 	sleep 20
